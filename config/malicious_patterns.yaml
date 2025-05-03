@@ -1,0 +1,14 @@
+syscalls:
+  - execve
+  - ptrace
+  - keyctl
+  - unlink
+  - fork
+  - clone
+dangerous_args:
+  - "O_WRONLY"
+  - "PROT_EXEC"
+  - "MAP_ANONYMOUS"
+  - "/dev/shm"
+  - "/etc/passwd"
+alert_sound: true

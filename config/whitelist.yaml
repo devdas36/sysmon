@@ -1,0 +1,11 @@
+# config/whitelist.yaml (Updated)
+pids:
+  - 1        # systemd
+  - 500      # example trusted process
+
+processes:
+  - "bash"
+  - "sshd"
+
+commands:
+  - "sudo apt update"
