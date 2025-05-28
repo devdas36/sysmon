@@ -8,6 +8,10 @@ from cli.interface import MainInterface
 from core.audit_parser import AuditParser
 from core.alert_engine import AlertEngine
 from core.log_exporter import export_logs
+from core.port_scan_detector import PortScanDetector
+from core.resource_monitor import ResourceMonitor
+from core.file_integrity_monitor import FileIntegrityMonitor
+
 
 activity_log_file = "system_activity.json"
 
@@ -76,6 +80,15 @@ def main():
     # Start background threads for additional monitoring
     threading.Thread(target=monitor_processes, daemon=True).start()
     threading.Thread(target=monitor_network, daemon=True).start()
+
+    port_scan = PortScanDetector()
+    threading.Thread(target=port_scan.monitor_ports, daemon=True).start()
+
+    resource_monitor = ResourceMonitor()
+    threading.Thread(target=resource_monitor.monitor_usage, daemon=True).start()
+
+    fim = FileIntegrityMonitor(watch_files=["/etc/passwd", "/etc/hosts"])
+    threading.Thread(target=fim.monitor_changes, daemon=True).start()
 
     try:
         MainInterface(audit_parser, alert_engine).run()
