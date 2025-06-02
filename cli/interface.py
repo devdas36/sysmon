@@ -4,7 +4,9 @@ from rich.live import Live
 from prompt_toolkit import prompt
 from prompt_toolkit.styles import Style
 import threading
+import pyfiglet
 import time
+
 
 class MainInterface:
     def __init__(self, audit_parser, alert_engine):
@@ -133,6 +135,7 @@ class MainInterface:
                 time.sleep(1)
 
     def show_main_menu(self):
+        print(pyfiglet.figlet_format("SYSMON", font="slant"))
         """Display main menu"""
         menu = Table.grid(padding=(1,2), pad_edge=True)
         menu.add_column(style="bold cyan")

@@ -6,3 +6,4 @@ Pygments==2.19.1
 PyYAML==6.0.2
 rich==14.0.0
 wcwidth==0.2.13
+pyfiglet==1.0.3
