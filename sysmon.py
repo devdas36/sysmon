@@ -11,13 +11,12 @@ from core.log_exporter import export_logs
 from core.port_scan_detector import PortScanDetector
 from core.resource_monitor import ResourceMonitor
 from core.file_integrity_monitor import FileIntegrityMonitor
-
+import os
 
 activity_log_file = "system_activity.json"
 
 process_snapshot = set()
 network_snapshot = set()
-
 
 def monitor_processes(interval=5):
     global process_snapshot
@@ -37,7 +36,6 @@ def monitor_processes(interval=5):
 
         process_snapshot = current_procs
         time.sleep(interval)
-
 
 def monitor_network(interval=5):
     global network_snapshot
@@ -63,7 +61,6 @@ def monitor_network(interval=5):
         network_snapshot = current_conns
         time.sleep(interval)
 
-
 def main():
     parser = argparse.ArgumentParser(description="Advanced System Call Monitoring Tool")
     parser.add_argument("-c", "--config", default="config/malicious_patterns.yaml", help="Path to config file")
@@ -72,6 +69,9 @@ def main():
 
     alert_engine = AlertEngine(args.config, sound_alerts=args.sound)
     audit_parser = AuditParser(alert_engine)
+    port_scan = PortScanDetector()
+    resource_monitor = ResourceMonitor()
+    fim = FileIntegrityMonitor(watch_files=["/etc/passwd", "/etc/hosts"])
 
     # Start real-time monitoring thread
     monitor_thread = threading.Thread(target=audit_parser.tail_logs, daemon=True)
@@ -80,22 +80,15 @@ def main():
     # Start background threads for additional monitoring
     threading.Thread(target=monitor_processes, daemon=True).start()
     threading.Thread(target=monitor_network, daemon=True).start()
-
-    port_scan = PortScanDetector()
     threading.Thread(target=port_scan.monitor_ports, daemon=True).start()
-
-    resource_monitor = ResourceMonitor()
     threading.Thread(target=resource_monitor.monitor_usage, daemon=True).start()
-
-    fim = FileIntegrityMonitor(watch_files=["/etc/passwd", "/etc/hosts"])
     threading.Thread(target=fim.monitor_changes, daemon=True).start()
 
     try:
-        MainInterface(audit_parser, alert_engine).run()
+        MainInterface(audit_parser, alert_engine, port_scan, resource_monitor, fim).run()
     except KeyboardInterrupt:
         export_logs(alert_engine.alerts, "monitor_logs.json")  # Auto-export on exit
         print("\n[!] Exiting...")
-
 
 if __name__ == "__main__":
     main()

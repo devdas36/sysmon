@@ -6,13 +6,17 @@ from prompt_toolkit.styles import Style
 import threading
 import pyfiglet
 import time
-
+import psutil
+import os
 
 class MainInterface:
-    def __init__(self, audit_parser, alert_engine):
+    def __init__(self, audit_parser, alert_engine, port_scan_detector, resource_monitor, file_integrity_monitor):
         self.console = Console()
         self.audit_parser = audit_parser
         self.alert_engine = alert_engine
+        self.port_scan_detector = port_scan_detector
+        self.resource_monitor = resource_monitor
+        self.file_integrity_monitor = file_integrity_monitor
         self.running = True
         self.style = Style.from_dict({
             'option': 'cyan bold',
@@ -62,6 +66,106 @@ class MainInterface:
                     args_text
                 )
         return table
+
+    def show_resources(self):
+        """Display system resource usage"""
+        self.console.clear()
+        table = Table(
+            title="[bold]System Resource Usage[/bold]",
+            show_header=True,
+            header_style="bold blue"
+        )
+        table.add_column("CPU %", style="red")
+        table.add_column("Memory %", style="green")
+        table.add_column("Process Count")
+        table.add_column("Network Connections")
+        
+        cpu_percent = psutil.cpu_percent()
+        mem_percent = psutil.virtual_memory().percent
+        process_count = len(psutil.pids())
+        net_connections = len(psutil.net_connections())
+        
+        table.add_row(
+            f"{cpu_percent:.1f}%",
+            f"{mem_percent:.1f}%",
+            str(process_count),
+            str(net_connections)
+        )
+        
+        self.console.print(table)
+        
+        # Show top processes
+        top_table = Table(
+            title="[bold]Top Processes[/bold]",
+            show_header=True,
+            header_style="bold magenta"
+        )
+        top_table.add_column("PID")
+        top_table.add_column("Name")
+        top_table.add_column("CPU %")
+        top_table.add_column("Memory %")
+        
+        for proc in sorted(psutil.process_iter(['pid', 'name', 'cpu_percent', 'memory_percent']), 
+                          key=lambda p: p.info['cpu_percent'], reverse=True)[:5]:
+            info = proc.info
+            top_table.add_row(
+                str(info['pid']),
+                info['name'][:20],
+                f"{info['cpu_percent']:.1f}%",
+                f"{info['memory_percent']:.1f}%"
+            )
+            
+        self.console.print(top_table)
+        prompt("[Press Enter to return]", style=self.style)
+
+    def show_network(self):
+        """Display network connections"""
+        self.console.clear()
+        table = Table(
+            title="[bold]Active Network Connections[/bold]",
+            show_header=True,
+            header_style="bold green"
+        )
+        table.add_column("Protocol")
+        table.add_column("Local Address")
+        table.add_column("Remote Address")
+        table.add_column("Status")
+        table.add_column("PID")
+        
+        for conn in psutil.net_connections():
+            if conn.raddr:
+                table.add_row(
+                    conn.type.name,
+                    f"{conn.laddr.ip}:{conn.laddr.port}" if conn.laddr else "-",
+                    f"{conn.raddr.ip}:{conn.raddr.port}" if conn.raddr else "-",
+                    conn.status,
+                    str(conn.pid))
+        
+        self.console.print(table)
+        prompt("[Press Enter to return]", style=self.style)
+
+    def show_file_monitor(self):
+        """Display file integrity monitoring status"""
+        self.console.clear()
+        table = Table(
+            title="[bold]File Integrity Monitoring[/bold]",
+            show_header=True,
+            header_style="bold yellow"
+        )
+        table.add_column("File Path")
+        table.add_column("Status")
+        table.add_column("Last Check")
+        
+        for file, current_hash in self.file_integrity_monitor.baseline.items():
+            status = "[green]OK[/green]" if os.path.exists(file) else "[red]Missing[/red]"
+            table.add_row(
+                file,
+                status,
+                time.ctime(os.path.getmtime(file)) if os.path.exists(file) else "N/A"
+            )
+        
+        self.console.print(table)
+        prompt("[Press Enter to return]", style=self.style)
 
     def live_monitoring(self):
         """Real-time monitoring view with proper refresh"""
@@ -127,8 +231,14 @@ class MainInterface:
             elif choice == '2':
                 self.show_alerts()
             elif choice == '3':
-                self.export_menu()
+                self.show_resources()
             elif choice == '4':
+                self.show_network()
+            elif choice == '5':
+                self.show_file_monitor()
+            elif choice == '6':
+                self.export_menu()
+            elif choice == '7':
                 self.running = False
             else:
                 self.console.print("[red]Invalid option![/red]")
@@ -139,10 +249,13 @@ class MainInterface:
         """Display main menu"""
         menu = Table.grid(padding=(1,2), pad_edge=True)
         menu.add_column(style="bold cyan")
-        menu.add_row("1", "Live Monitoring (Last 10 events)")
+        menu.add_row("1", "Live System Call Monitoring")
         menu.add_row("2", "View Security Alerts")
-        menu.add_row("3", "Export Logs")
-        menu.add_row("4", "Exit")
+        menu.add_row("3", "System Resources")
+        menu.add_row("4", "Network Connections")
+        menu.add_row("5", "File Integrity Monitor")
+        menu.add_row("6", "Export Logs")
+        menu.add_row("7", "Exit")
         
         self.console.print(menu)
         return prompt("Select an option: ", style=self.style)
